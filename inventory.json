@@ -1,18 +1,24 @@
 [
     {
-        "type": "physical",
         "product_id": "200",
-        "name": "wheels",
-        "price": 50.0,
+        "name": "cheese",
+        "price": 200.0,
         "stock": 10,
-        "weight": 5.0
+        "supplier_id": "S_200",
+        "supplier_name": "Cheeseman",
+        "supplier_email": "",
+        "type": "physical",
+        "weight": 100.0
     },
     {
+        "product_id": "001",
+        "name": "minecraft",
+        "price": 30.0,
+        "stock": 100000,
+        "supplier_id": "S_001",
+        "supplier_name": "mojang",
+        "supplier_email": "",
         "type": "digital",
-        "product_id": "2001",
-        "name": "discs",
-        "price": 10.0,
-        "stock": 100,
-        "download_size": 900.0
+        "download_size": 3000.0
     }
 ]

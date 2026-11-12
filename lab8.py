@@ -2,20 +2,36 @@ import json
 import os
 from abc import ABC, abstractmethod
 
+
 # Interface contract for products that support shipping calculations
 class CanBeShipped(ABC):
     @abstractmethod
     def calculate_shipping_cost(self) -> float:
         pass
-    
-class Product(ABC):
-    def __init__(self, product_id: str, name: str, price: float, stock: int, supplier: Supplier):
-        self.product_id: str = product_id
-        self.name: str = name
-        self.price: float = price
-        self.stock: int = stock
-        self.supplier: Supplier = supplier  # type hint for association reference
 
+
+# Supplier class for association - can exist independently from a product
+class Supplier:
+    def __init__(self, supplier_id: str, name: str, contact_email: str):
+        self.supplier_id: str = supplier_id
+        self.name: str = name
+        self.contact_email: str = contact_email
+
+    def display_information(self) -> None:
+        print(f"Supplier: {self.name} | Email: {self.contact_email}")
+
+
+class Product(ABC):
+    """Abstract base class representing a generic product with a Supplier association."""
+
+    def __init__(self, product_id: str, name: str, price: float, stock: int, supplier: Supplier):
+        self._product_id: str = product_id
+        self._name: str = name
+        self.price = price    # goes through the price setter (validation)
+        self.stock = stock    # goes through the stock setter (validation)
+        self.supplier: Supplier = supplier
+
+    # ---- properties (backing fields use a leading underscore) ----
     @property
     def product_id(self) -> str:
         return self._product_id
@@ -28,12 +44,25 @@ class Product(ABC):
     def price(self) -> float:
         return self._price
 
+    @price.setter
+    def price(self, value: float) -> None:
+        if value < 0:
+            raise ValueError("Price cannot be negative.")
+        self._price = value
+
     @property
     def stock(self) -> int:
         return self._stock
 
+    @stock.setter
+    def stock(self, value: int) -> None:
+        if value < 0:
+            raise ValueError("Stock cannot be negative.")
+        self._stock = value
+
+    # ---- behaviour ----
     def update_stock(self, quantity: int) -> None:
-        """Encapsulates stock modification to prevent negative states."""
+        """Safely updates stock inventory level."""
         new_stock = self._stock + quantity
         if new_stock < 0:
             print("Error: Stock cannot be negative!")
@@ -42,25 +71,47 @@ class Product(ABC):
             print(f"Stock updated successfully for {self._name}. Current stock: {self._stock}")
 
     def display_information(self) -> None:
+        """Displays common product details including associated supplier."""
         print(f"ID: {self._product_id} | Name: {self._name} | Price: ${self._price:.2f} | Stock: {self._stock}", end="")
+        print(f" | Supplier: {self.supplier.name} ({self.supplier.contact_email})", end="")
+
+    def _base_dict(self) -> dict:
+        """Common fields (including supplier) shared by all subclasses."""
+        return {
+            "product_id": self._product_id,
+            "name": self._name,
+            "price": self._price,
+            "stock": self._stock,
+            "supplier_id": self.supplier.supplier_id,
+            "supplier_name": self.supplier.name,
+            "supplier_email": self.supplier.contact_email,
+        }
 
     @abstractmethod
     def get_fulfilment_info(self) -> str:
-        """Force child classes to define fulfillment."""
+        """Abstract method forcing subclasses to define fulfilment behavior."""
         pass
 
     @abstractmethod
     def to_dict(self) -> dict:
+        """Abstract method for dictionary serialization."""
         pass
-    
+
+
 class PhysicalProduct(Product, CanBeShipped):
-    def __init__(self, product_id: str, name: str, price: float, stock: int, weight: float):
-        super().__init__(product_id, name, price, stock)
-        self._weight = weight
+    def __init__(self, product_id: str, name: str, price: float, stock: int, supplier: Supplier, weight: float):
+        super().__init__(product_id, name, price, stock, supplier)
+        self.weight = weight  # goes through the weight setter
 
     @property
     def weight(self) -> float:
         return self._weight
+
+    @weight.setter
+    def weight(self, value: float) -> None:
+        if value < 0:
+            raise ValueError("Weight cannot be negative.")
+        self._weight = value
 
     def display_information(self) -> None:
         super().display_information()
@@ -73,24 +124,26 @@ class PhysicalProduct(Product, CanBeShipped):
         return 5.00 + (2.00 * self._weight)
 
     def to_dict(self) -> dict:
-        return {
-            "type": "physical",
-            "product_id": self._product_id,
-            "name": self._name,
-            "price": self._price,
-            "stock": self._stock,
-            "weight": self._weight
-        }
+        data = self._base_dict()
+        data["type"] = "physical"
+        data["weight"] = self._weight
+        return data
 
 
 class DigitalProduct(Product):
-    def __init__(self, product_id: str, name: str, price: float, stock: int, download_size: float):
-        super().__init__(product_id, name, price, stock)
-        self._download_size = download_size
+    def __init__(self, product_id: str, name: str, price: float, stock: int, supplier: Supplier, download_size: float):
+        super().__init__(product_id, name, price, stock, supplier)
+        self.download_size = download_size  # goes through the setter
 
     @property
     def download_size(self) -> float:
         return self._download_size
+
+    @download_size.setter
+    def download_size(self, value: float) -> None:
+        if value < 0:
+            raise ValueError("Download size cannot be negative.")
+        self._download_size = value
 
     def display_information(self) -> None:
         super().display_information()
@@ -100,53 +153,55 @@ class DigitalProduct(Product):
         return "Delivered via digital download link"
 
     def to_dict(self) -> dict:
-        return {
-            "type": "digital",
-            "product_id": self._product_id,
-            "name": self._name,
-            "price": self._price,
-            "stock": self._stock,
-            "download_size": self._download_size
-        }
-    
+        data = self._base_dict()
+        data["type"] = "digital"
+        data["download_size"] = self._download_size
+        return data
+
+
 class Inventory:
-"""Manages a collection of Product objects using aggregation[cite: 25]."""
+    """Manages a collection of Product objects using aggregation."""
+
     def __init__(self):
-        self.products: list[Product] = []  # typed collection[cite: 25]
+        self.products: list[Product] = []
 
     def add_product(self, product: Product) -> bool:
+        if self.search_product(product.product_id) is not None:
+            print(f"Error: a product with ID '{product.product_id}' already exists.")
+            return False
         self.products.append(product)
-        print(f"Added {product.name} to inventory aggregation.")
+        print(f"Added {product.name} to inventory.")
         return True
 
     def remove_product(self, product_id: str) -> bool:
-        # removes reference without destroying the product object itself[cite: 25]
-        product = self.find_product(product_id)
+        # removes the reference without destroying the product object itself
+        product = self.search_product(product_id)
         if product:
             self.products.remove(product)
             return True
         return False
 
-    def search_product(self, product_id: str) -> Product | None:
+    def search_product(self, product_id: str):
         for product in self.products:
             if product.product_id == product_id:
                 return product
         return None
 
     def display_all(self) -> None:
-        if not self._products:
+        if not self.products:
             print("\nInventory is currently empty.")
             return
-        
+
         print("\n--- Current Inventory ---")
-        for product in self._products.values():
+        for product in self.products:
             product.display_information()
         print("-------------------------")
 
     def save_to_file(self, filename: str = "inventory.json") -> None:
-        data = [p.to_dict() for p in self._products.values()]
+        """Saves inventory items preserving their specific subclasses/types."""
+        data = [product.to_dict() for product in self.products]
         try:
-            with open(filename, 'w') as f:
+            with open(filename, "w") as f:
                 json.dump(data, f, indent=4)
             print(f"Inventory successfully saved to {filename}.")
         except IOError as e:
@@ -154,50 +209,52 @@ class Inventory:
 
     def load_from_file(self, filename: str = "inventory.json") -> None:
         if not os.path.exists(filename):
-            print(f"No existing file found at {filename}. Starting with an empty inventory.")
             return
-        
         try:
-            with open(filename, 'r') as f:
+            with open(filename, "r") as f:
                 data = json.load(f)
-                self._products.clear()
-                for item in data:
-                    ptype = item.get("type")
-                    if ptype == "physical":
-                        p = PhysicalProduct(
-                            item["product_id"],
-                            item["name"],
-                            float(item["price"]),
-                            int(item["stock"]),
-                            float(item["weight"])
-                        )
-                    elif ptype == "digital":
-                        p = DigitalProduct(
-                            item["product_id"],
-                            item["name"],
-                            float(item["price"]),
-                            int(item["stock"]),
-                            float(item["download_size"])
-                        )
-                    else:
-                        continue
-                    self._products[p.product_id] = p
+
+            self.products.clear()
+            for item in data:
+                ptype = item.get("type")
+
+                # Recreate the associated Supplier object from saved data
+                supplier = Supplier(
+                    item.get("supplier_id", "S001"),
+                    item.get("supplier_name", "Default Supplier"),
+                    item.get("supplier_email", "supplier@email.com"),
+                )
+
+                if ptype == "physical":
+                    product = PhysicalProduct(
+                        item["product_id"],
+                        item["name"],
+                        float(item["price"]),
+                        int(item["stock"]),
+                        supplier,
+                        float(item["weight"]),
+                    )
+                elif ptype == "digital":
+                    product = DigitalProduct(
+                        item["product_id"],
+                        item["name"],
+                        float(item["price"]),
+                        int(item["stock"]),
+                        supplier,
+                        float(item["download_size"]),
+                    )
+                else:
+                    continue
+
+                self.products.append(product)
             print(f"Inventory successfully loaded from {filename}.")
-        except (IOError, json.JSONDecodeError) as e:
+        except (IOError, json.JSONDecodeError, KeyError, ValueError) as e:
             print(f"Error loading file: {e}")
 
-# new supplier class for association - can exist independently from product
-class Supplier:
-    def __init__(self, supplier_id: str, name: str, contact_email: str):
-        self.supplier_id: str = supplier_id
-        self.name: str = name
-        self.contact_email: str = contact_email
-
-    def display_information(self) -> None:
-        print(f"Supplier: {self.name} | Email: {self.contact_email}")
 
 class OrderLine:
-    """Represents a line item referencing a Product[cite: 25]."""
+    """Represents a line item referencing a Product."""
+
     def __init__(self, product: Product, quantity: int):
         self.product: Product = product
         self.quantity: int = quantity
@@ -205,29 +262,51 @@ class OrderLine:
     def calculate_subtotal(self) -> float:
         return self.product.price * self.quantity
 
+
 class Order:
-    """Order owns OrderLine collection via composition[cite: 25]."""
+    """Order owns OrderLine collection via composition."""
+
     def __init__(self, order_id: str):
         self.order_id: str = order_id
-        self.order_lines: list[OrderLine] = []  # internal composition lifecycle
+        self.order_lines: list[OrderLine] = []
 
     def add_order_line(self, product: Product, quantity: int) -> None:
-        # Order creates its own order lines here[cite: 25]
         line = OrderLine(product, quantity)
         self.order_lines.append(line)
 
     def calculate_total(self) -> float:
         total: float = 0.0
-        for l in self.order_lines:
-            total += l.calculate_subtotal()
+        for line in self.order_lines:
+            total += line.calculate_subtotal()
         return total
+
+
+# test function to demonstrate LSP and polymorphism
+def show_product_details(product: Product) -> None:
+    product.display_information()
+    print(f"   -> Fulfilment: {product.get_fulfilment_info()}")
+
+
+def read_common_fields():
+    """Prompts for the fields shared by every product type (including the supplier)."""
+    pid = input("Enter Product ID: ").strip()
+    if not pid:
+        raise ValueError("Product ID cannot be empty.")
+    name = input("Enter Product Name: ").strip()
+    price = float(input("Enter Price ($): "))
+    stock = int(input("Enter Initial Stock Quantity: "))
+    sup_name = input("Enter Supplier Name: ").strip()
+    sup_email = input("Enter Supplier Email: ").strip()
+    supplier = Supplier(f"S_{pid}", sup_name, sup_email)
+    return pid, name, price, stock, supplier
+
 
 def main():
     inventory = Inventory()
     inventory.load_from_file("inventory.json")
 
     while True:
-        print("\n=== Inventory Management System (Lab 7) ===")
+        print("\n=== Inventory Management System (Lab 8) ===")
         print("1. Display all products")
         print("2. Add a Physical Product")
         print("3. Add a Digital Product")
@@ -235,37 +314,26 @@ def main():
         print("5. Search for a product & calculate shipping")
         print("6. Save inventory")
         print("7. Exit")
-        
+
         choice = input("Enter your choice (1-7): ").strip()
-        
-        if choice == '1':
+
+        if choice == "1":
             inventory.display_all()
-            
-        elif choice == '2':
-            pid = input("Enter Product ID: ").strip()
-            name = input("Enter Product Name: ").strip()
+
+        elif choice in ("2", "3"):
             try:
-                price = float(input("Enter Price ($): "))
-                stock = int(input("Enter Initial Stock Quantity: "))
-                weight = float(input("Enter Weight (kg): "))
-                new_product = PhysicalProduct(pid, name, price, stock, weight)
+                pid, name, price, stock, supplier = read_common_fields()
+                if choice == "2":
+                    weight = float(input("Enter Product Weight (kg): "))
+                    new_product = PhysicalProduct(pid, name, price, stock, supplier, weight)
+                else:
+                    download_size = float(input("Enter Download Size (MB): "))
+                    new_product = DigitalProduct(pid, name, price, stock, supplier, download_size)
                 inventory.add_product(new_product)
-            except ValueError:
-                print("Invalid input! Please check your numeric values.")
-                
-        elif choice == '3':
-            pid = input("Enter Product ID: ").strip()
-            name = input("Enter Product Name: ").strip()
-            try:
-                price = float(input("Enter Price ($): "))
-                stock = int(input("Enter Initial Stock Quantity: "))
-                download_size = float(input("Enter Download Size (MB): "))
-                new_product = DigitalProduct(pid, name, price, stock, download_size)
-                inventory.add_product(new_product)
-            except ValueError:
-                print("Invalid input! Please check your numeric values.")
-                
-        elif choice == '4':
+            except ValueError as e:
+                print(f"Invalid input! {e}")
+
+        elif choice == "4":
             pid = input("Enter Product ID to update stock: ").strip()
             product = inventory.search_product(pid)
             if product:
@@ -276,8 +344,8 @@ def main():
                     print("Invalid input! Quantity must be an integer.")
             else:
                 print(f"Product with ID '{pid}' not found.")
-                
-        elif choice == '5':
+
+        elif choice == "5":
             pid = input("Enter Product ID to search: ").strip()
             product = inventory.search_product(pid)
             if product:
@@ -288,16 +356,18 @@ def main():
                     print(f"Estimated Shipping Cost: ${shipping_cost:.2f}")
             else:
                 print(f"Product with ID '{pid}' not found.")
-                
-        elif choice == '6':
+
+        elif choice == "6":
             inventory.save_to_file("inventory.json")
-            
-        elif choice == '7':
+
+        elif choice == "7":
             inventory.save_to_file("inventory.json")
             print("Exiting program. Goodbye!")
             break
+
         else:
             print("Invalid choice. Please enter a number between 1 and 7.")
+
 
 if __name__ == "__main__":
     main()
