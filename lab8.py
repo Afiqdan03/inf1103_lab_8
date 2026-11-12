@@ -196,6 +196,32 @@ class Supplier:
     def display_information(self) -> None:
         print(f"Supplier: {self.name} | Email: {self.contact_email}")
 
+class OrderLine:
+    """Represents a line item referencing a Product[cite: 25]."""
+    def __init__(self, product: Product, quantity: int):
+        self.product: Product = product
+        self.quantity: int = quantity
+
+    def calculate_subtotal(self) -> float:
+        return self.product.price * self.quantity
+
+class Order:
+    """Order owns OrderLine collection via composition[cite: 25]."""
+    def __init__(self, order_id: str):
+        self.order_id: str = order_id
+        self.order_lines: list[OrderLine] = []  # internal composition lifecycle
+
+    def add_order_line(self, product: Product, quantity: int) -> None:
+        # Order creates its own order lines here[cite: 25]
+        line = OrderLine(product, quantity)
+        self.order_lines.append(line)
+
+    def calculate_total(self) -> float:
+        total: float = 0.0
+        for l in self.order_lines:
+            total += l.calculate_subtotal()
+        return total
+
 def main():
     inventory = Inventory()
     inventory.load_from_file("inventory.json")
