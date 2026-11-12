@@ -166,7 +166,7 @@ class Inventory:
         self.products: list[Product] = []
 
     def add_product(self, product: Product) -> bool:
-        if self.search_product(product.product_id) is not None:
+        if self.find_product(product.product_id) is not None:
             print(f"Error: a product with ID '{product.product_id}' already exists.")
             return False
         self.products.append(product)
@@ -175,13 +175,13 @@ class Inventory:
 
     def remove_product(self, product_id: str) -> bool:
         # removes the reference without destroying the product object itself
-        product = self.search_product(product_id)
+        product = self.find_product(product_id)
         if product:
             self.products.remove(product)
             return True
         return False
 
-    def search_product(self, product_id: str):
+    def find_product(self, product_id: str) -> Product | None:
         for product in self.products:
             if product.product_id == product_id:
                 return product
@@ -274,6 +274,14 @@ class Order:
         line = OrderLine(product, quantity)
         self.order_lines.append(line)
 
+    def remove_order_line(self, product_id: str) -> bool:
+        """Order manages its own lines, so removal also goes through Order."""
+        for line in self.order_lines:
+            if line.product.product_id == product_id:
+                self.order_lines.remove(line)
+                return True
+        return False
+
     def calculate_total(self) -> float:
         total: float = 0.0
         for line in self.order_lines:
@@ -335,7 +343,7 @@ def main():
 
         elif choice == "4":
             pid = input("Enter Product ID to update stock: ").strip()
-            product = inventory.search_product(pid)
+            product = inventory.find_product(pid)
             if product:
                 try:
                     qty = int(input("Enter stock change amount (negative to reduce): "))
@@ -347,7 +355,7 @@ def main():
 
         elif choice == "5":
             pid = input("Enter Product ID to search: ").strip()
-            product = inventory.search_product(pid)
+            product = inventory.find_product(pid)
             if product:
                 print("\nProduct Found:")
                 product.display_information()

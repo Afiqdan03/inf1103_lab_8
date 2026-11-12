@@ -1,4 +1,4 @@
 FROM python:3.11-slim
 WORKDIR /app
-COPY lab7.py .
-CMD ["python", "lab7.py"]
+COPY lab8.py .
+CMD ["python", "lab8.py"]
