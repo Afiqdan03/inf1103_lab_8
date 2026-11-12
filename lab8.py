@@ -110,20 +110,28 @@ class DigitalProduct(Product):
         }
     
 class Inventory:
-    """Manages a collection of Product objects and file persistence."""
+"""Manages a collection of Product objects using aggregation[cite: 25]."""
     def __init__(self):
-        self._products = {}
+        self.products: list[Product] = []  # typed collection[cite: 25]
 
     def add_product(self, product: Product) -> bool:
-        if product.product_id in self._products:
-            print(f"Error: Product ID {product.product_id} already exists.")
-            return False
-        self._products[product.product_id] = product
-        print(f"Product '{product.name}' added successfully.")
+        self.products.append(product)
+        print(f"Added {product.name} to inventory aggregation.")
         return True
 
-    def search_product(self, product_id: str) -> Product:
-        return self._products.get(product_id)
+    def remove_product(self, product_id: str) -> bool:
+        # removes reference without destroying the product object itself[cite: 25]
+        product = self.find_product(product_id)
+        if product:
+            self.products.remove(product)
+            return True
+        return False
+
+    def search_product(self, product_id: str) -> Product | None:
+        for product in self.products:
+            if product.product_id == product_id:
+                return product
+        return None
 
     def display_all(self) -> None:
         if not self._products:
