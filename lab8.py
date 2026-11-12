@@ -9,12 +9,12 @@ class CanBeShipped(ABC):
         pass
     
 class Product(ABC):
-    """Abstract base class representing a generic product."""
-    def __init__(self, product_id: str, name: str, price: float, stock: int):
-        self._product_id = product_id
-        self._name = name
-        self._price = price
-        self._stock = stock
+    def __init__(self, product_id: str, name: str, price: float, stock: int, supplier: Supplier):
+        self.product_id: str = product_id
+        self.name: str = name
+        self.price: float = price
+        self.stock: int = stock
+        self.supplier: Supplier = supplier  # type hint for association reference
 
     @property
     def product_id(self) -> str:
@@ -177,6 +177,16 @@ class Inventory:
             print(f"Inventory successfully loaded from {filename}.")
         except (IOError, json.JSONDecodeError) as e:
             print(f"Error loading file: {e}")
+
+# new supplier class for association - can exist independently from product
+class Supplier:
+    def __init__(self, supplier_id: str, name: str, contact_email: str):
+        self.supplier_id: str = supplier_id
+        self.name: str = name
+        self.contact_email: str = contact_email
+
+    def display_information(self) -> None:
+        print(f"Supplier: {self.name} | Email: {self.contact_email}")
 
 def main():
     inventory = Inventory()
